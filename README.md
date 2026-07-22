@@ -218,6 +218,24 @@ git diff --check
 
 Windowsでは`.venv/bin/python`の代わりに`.venv\Scripts\python.exe`を使用してください。
 
+## Continuous Integration
+
+GitHub Actionsにより、リポジトリへのpushとPull Requestのたびに品質チェックを自動実行します。
+
+- 実行環境: `ubuntu-latest`
+- Python: `3.11`
+- `requirements.txt`から依存ライブラリをインストール
+- `python -m pytest -q`による全テスト
+- `python -m compileall -q app.py config.py src tests`による構文確認
+
+Workflowは[`.github/workflows/python.yml`](.github/workflows/python.yml)で管理しています。
+
+公開先が決まったら、以下のプレースホルダーをGitHubのユーザー名とリポジトリ名に置き換えてREADME冒頭へ配置できます。
+
+```markdown
+![Python CI](https://github.com/<GITHUB_USERNAME>/<REPOSITORY_NAME>/actions/workflows/python.yml/badge.svg)
+```
+
 ## Screenshots
 
 公開用画像は`assets/screenshots/`へ配置します。以下は追加予定ファイルのプレースホルダーです。
