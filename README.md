@@ -52,6 +52,8 @@
 - Accuracy、Precision、Recall、F1、ROC-AUC
 - Gain Importance（分岐による損失関数の改善量）
 - Split Importance（木の分岐に使われた回数）
+- 学習期間のGain順位によるAll 20 / Top 15 / Top 10 / Baseline 9比較実験
+- 翌営業日Targetがテスト初日を参照する境界サンプル1件を実験学習データから除外
 - 固定した`random_state`による再現性
 
 ### Backtesting
@@ -120,6 +122,7 @@ stock-analysis-dashboard/
 │   ├── data_loader.py             # yfinance取得・検証・整形
 │   ├── features.py                # 特徴量・Target・学習データ
 │   ├── model.py                   # 時系列分割・LightGBM・評価
+│   ├── feature_selection.py       # 学習期間だけで行う特徴量セット比較
 │   ├── backtest.py                # 翌営業日執行バックテスト
 │   ├── visualization.py           # Plotlyグラフ
 │   └── utils.py                   # 共通の入力検証
@@ -128,6 +131,8 @@ stock-analysis-dashboard/
 │   ├── test_data_loader.py
 │   ├── test_features.py
 │   ├── test_model.py
+│   ├── test_feature_selection.py
+│   ├── test_visualization.py
 │   └── test_backtest.py
 ├── data/
 │   ├── raw/                       # 元データ保存用（現在は未使用）
@@ -138,7 +143,8 @@ stock-analysis-dashboard/
 │   ├── development_log.md
 │   ├── experiments/               # モデル・戦略の実験記録
 │   │   ├── 2026-07-23_baseline.md # Experiment 0の比較基準
-│   │   └── 2026-07-23_technical_indicators.md # Phase 8の比較結果
+│   │   ├── 2026-07-23_technical_indicators.md # Phase 8の比較結果
+│   │   └── 2026-07-23_feature_selection.md # Phase 10の比較結果
 │   └── images/                    # 構成図などの保存先
 └── assets/
     └── screenshots/               # README掲載画像の保存先
