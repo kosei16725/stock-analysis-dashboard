@@ -261,3 +261,50 @@ Streamlitへの予測・バックテスト表示と、取引コストを考慮�
 - Baseline experiment added: `docs/experiments/2026-07-23_baseline.md`
 - 現行のLightGBM分類指標、バックテスト指標、特徴量一覧をExperiment 0として記録した。
 - RSI、MACD、Optuna、XGBoostなどの改善案は、このBaselineと同じ条件で比較する。
+
+---
+
+# Phase 8: Technical Indicators
+
+## 日付
+
+2026-07-23
+
+## 実装した内容
+
+- 14日RSIをモデル特徴量へ追加
+- EMA12、EMA26、MACD、9日Signal、Histogramを追加
+- Bollinger Bandsの20日母標準偏差、Upper、Lower、Band Width、%Bを追加
+- FEATURE_COLUMNSを9列から20列へ拡張
+- RSI、MACD、Bollinger Bandsを責務ごとの関数へ分離
+
+## 計算方式
+
+- RSIは最初の14個のGain / Lossを算術平均で初期化し、15個目以降を`((前日の平均 × 13) + 当日の値) / 14`で更新する厳密なWilder方式とした。値動きがない場合は50とする。
+- MACDはEMA12 - EMA26、SignalはMACDの9日EMA、HistogramはMACD - Signalとした。
+- Bollinger BandsはMA20と20日母標準偏差（`ddof=0`）を使い、Upper / Lowerを±2σで計算した。
+- Band Widthは(Upper - Lower) / MA20、%Bは(Close - Lower) / (Upper - Lower)とした。バンド幅0の%Bは0.5とした。
+
+## 未来情報漏洩を防ぐ考え方
+
+rollingは`center=True`を使わず当日を窓の末尾とする。EMAは過去から当日までの値だけを使う`adjust=False`とし、未来方向の補完は行わない。将来部分の価格・出来高を変更しても、それ以前の全FEATURE_COLUMNSが不変であることを既存テストで確認する。
+
+## テスト
+
+- RSIが0〜100に収まり、上昇系列で高く、下落系列で低くなることを確認した。
+- MACD、Signal、Histogramの定義式を確認した。
+- Bollinger Upper >= Middle >= Lowerと、Band Width・%Bの式を確認した。
+- 定数系列で無限値が発生せず、RSI 50、Band Width 0、%B 0.5となることを確認した。
+- 特徴量作成が入力DataFrameを変更しないことを確認した。
+- 厳密なWilder初期化テストを含む全54テストが成功した。
+
+## 注意点
+
+Phase 8をBaselineと同じ銘柄、期間、モデル、時系列分割、Buy閾値、バックテスト条件で実測した。
+
+- 分類指標ではAccuracy、Precision、Recall、F1が上昇し、ROC-AUCは低下した。
+- バックテスト指標ではTotal Return、Annual Return、Sharpe Ratioが上昇した。
+- Max Drawdownは-5.44%から-7.55%へ拡大し、Win RateとTotal Tradesは低下した。
+- テストデータは39件で、単一銘柄・単一期間の結果に限られる。
+
+分類・収益指標の一部は向上した一方、ROC-AUCや最大ドローダウンなどは悪化している。このため、Phase 8が総合的または将来的にBaselineより優れているとは断定しない。実測値は`docs/experiments/2026-07-23_technical_indicators.md`へ保存し、Experiment 0 Baselineは変更していない。

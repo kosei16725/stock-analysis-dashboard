@@ -4,12 +4,23 @@ import numpy as np
 import pandas as pd
 
 from src.constants import (
+    BB_LOWER_20_COLUMN,
+    BB_PERCENT_B_20_COLUMN,
+    BB_STD_20_COLUMN,
+    BB_UPPER_20_COLUMN,
+    BB_WIDTH_20_COLUMN,
     CLOSE_COLUMN,
     DAILY_RETURN_COLUMN,
+    EMA_12_COLUMN,
+    EMA_26_COLUMN,
     FEATURE_COLUMNS,
+    MACD_COLUMN,
+    MACD_HISTOGRAM_COLUMN,
+    MACD_SIGNAL_COLUMN,
     MA_DEVIATION_COLUMN,
     RETURN_5_COLUMN,
     RETURN_20_COLUMN,
+    RSI_14_COLUMN,
     TARGET_COLUMN,
     VOLATILITY_20_COLUMN,
     VOLUME_CHANGE_COLUMN,
@@ -20,6 +31,152 @@ from src.constants import (
 
 class FeatureEngineeringError(ValueError):
     """特徴量または目的変数を作成できない場合の例外。"""
+
+
+def _calculate_wilder_average(values: pd.Series, period: int) -> pd.Series:
+    """最初の算術平均をシードとしてWilderの再帰平均を計算する。
+
+    Args:
+        values: 日付昇順のGainまたはLoss。
+        period: 算術平均と再帰更新に用いる期間。
+
+    Returns:
+        最初のperiod個を算術平均し、以降をWilder式で更新したSeries。
+        有効値がperiod個連続するまでNaN。
+
+    Raises:
+        ValueError: periodが1未満の場合。
+    """
+    if period < 1:
+        raise ValueError("Wilder平均の期間は1以上で指定してください。")
+
+    result = pd.Series(np.nan, index=values.index, dtype=float)
+    previous_average = np.nan
+    for position in range(period, len(values)):
+        current_value = values.iloc[position]
+        if np.isnan(previous_average):
+            initial_values = values.iloc[position - period + 1: position + 1]
+            if initial_values.notna().all():
+                previous_average = float(initial_values.mean())
+            else:
+                continue
+        elif pd.isna(current_value):
+            # 欠損を未来方向へ補完せず、再びperiod個そろうまで計算しない。
+            previous_average = np.nan
+            continue
+        else:
+            previous_average = (
+                previous_average * (period - 1) + float(current_value)
+            ) / period
+        result.iloc[position] = previous_average
+    return result
+
+
+def calculate_rsi(close: pd.Series) -> pd.Series:
+    """算術平均で初期化した厳密なWilder方式でRSIを計算する。
+
+    最初の14個の上昇幅・下落幅をそれぞれ算術平均する。以降は前日の
+    平均を13倍して当日の値を加え、14で割る再帰式を使用する。
+    値動きが全くない場合は中立値50とする。
+
+    Args:
+        close: 日付昇順の終値Series。
+
+    Returns:
+        0以上100以下のRSI。計算期間に満たない先頭行はNaN。
+
+    Raises:
+        なし。
+    """
+    period = 14
+    delta = close.diff()
+    gains = delta.clip(lower=0.0)
+    losses = -delta.clip(upper=0.0)
+    average_gain = _calculate_wilder_average(gains, period)
+    average_loss = _calculate_wilder_average(losses, period)
+    total_movement = average_gain + average_loss
+    rsi = 100.0 * average_gain / total_movement.where(total_movement != 0)
+    rsi = rsi.mask(total_movement == 0, 50.0).clip(lower=0.0, upper=100.0)
+    rsi.name = RSI_14_COLUMN
+    return rsi
+
+
+def calculate_macd(
+    close: pd.Series,
+) -> pd.DataFrame:
+    """終値のEMAからMACD、Signal、Histogramを計算する。
+
+    Args:
+        close: 日付昇順の終値Series。
+
+    Returns:
+        EMA12、EMA26、MACD、Signal、Histogramを持つDataFrame。
+
+    Raises:
+        なし。
+    """
+    short_span, long_span, signal_span = 12, 26, 9
+    ema_short = close.ewm(
+        span=short_span, adjust=False, min_periods=short_span
+    ).mean()
+    ema_long = close.ewm(
+        span=long_span, adjust=False, min_periods=long_span
+    ).mean()
+    macd = ema_short - ema_long
+    signal = macd.ewm(
+        span=signal_span, adjust=False, min_periods=signal_span
+    ).mean()
+    histogram = macd - signal
+    return pd.DataFrame(
+        {
+            EMA_12_COLUMN: ema_short,
+            EMA_26_COLUMN: ema_long,
+            MACD_COLUMN: macd,
+            MACD_SIGNAL_COLUMN: signal,
+            MACD_HISTOGRAM_COLUMN: histogram,
+        },
+        index=close.index,
+    )
+
+
+def calculate_bollinger_bands(
+    close: pd.Series,
+) -> pd.DataFrame:
+    """20日移動平均と母標準偏差からBollinger Bandsを計算する。
+
+    Args:
+        close: 日付昇順の終値Series。
+
+    Returns:
+        標準偏差、Upper、Lower、Band Width、%Bを持つDataFrame。
+        Middleは既存のMA_20と同じため重複して返さない。バンド幅が0の%Bは
+        中立値0.5とする。
+
+    Raises:
+        なし。
+    """
+    window, standard_deviations = 20, 2.0
+    middle = close.rolling(window=window, min_periods=window).mean()
+    standard_deviation = close.rolling(
+        window=window, min_periods=window
+    ).std(ddof=0)
+    upper = middle + standard_deviations * standard_deviation
+    lower = middle - standard_deviations * standard_deviation
+    band_range = upper - lower
+    band_width = band_range / middle.where(middle != 0)
+    percent_b = (close - lower) / band_range.where(band_range != 0)
+    percent_b = percent_b.mask((band_range == 0) & band_range.notna(), 0.5)
+
+    return pd.DataFrame(
+        {
+            BB_STD_20_COLUMN: standard_deviation,
+            BB_UPPER_20_COLUMN: upper,
+            BB_LOWER_20_COLUMN: lower,
+            BB_WIDTH_20_COLUMN: band_width,
+            BB_PERCENT_B_20_COLUMN: percent_b,
+        },
+        index=close.index,
+    )
 
 
 def validate_feature_input(data: pd.DataFrame) -> None:
@@ -55,7 +212,7 @@ def create_features(data: pd.DataFrame) -> pd.DataFrame:
         data: Close列とVolume列を含む日足DataFrame。
 
     Returns:
-        元データに9個の特徴量列を追加した、日付昇順のDataFrame。
+        元データに20個の特徴量列を追加した、日付昇順のDataFrame。
 
     Raises:
         FeatureEngineeringError: 入力が空、または必要列が不足している場合。
@@ -81,6 +238,13 @@ def create_features(data: pd.DataFrame) -> pd.DataFrame:
         window=20, min_periods=20
     ).std()
     featured[VOLUME_CHANGE_COLUMN] = volume.pct_change(periods=1, fill_method=None)
+    featured[RSI_14_COLUMN] = calculate_rsi(close)
+
+    macd_features = calculate_macd(close)
+    featured.loc[:, macd_features.columns] = macd_features
+
+    bollinger_features = calculate_bollinger_bands(close)
+    featured.loc[:, bollinger_features.columns] = bollinger_features
 
     # 0除算などで生じる無限値は、後段で欠損値として必要な行だけ除外する。
     featured.loc[:, FEATURE_COLUMNS] = featured.loc[:, FEATURE_COLUMNS].replace(

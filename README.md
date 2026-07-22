@@ -38,6 +38,9 @@
 - Daily Return、5日リターン、20日リターン
 - MA5、MA20、MA50、MA20乖離率
 - 20日ボラティリティ、出来高変化率
+- 14日RSI（Wilder方式の指数平滑）
+- EMA12、EMA26、MACD、Signal、Histogram
+- Bollinger Bands（20日・2σ）、Band Width、%B
 - 翌営業日の上昇を表すTarget
 - 欠損値・無限値・列不足・空データの検証
 
@@ -130,7 +133,8 @@ stock-analysis-dashboard/
 │   ├── system_design.md
 │   ├── development_log.md
 │   ├── experiments/               # モデル・戦略の実験記録
-│   │   └── 2026-07-23_baseline.md # Experiment 0の比較基準
+│   │   ├── 2026-07-23_baseline.md # Experiment 0の比較基準
+│   │   └── 2026-07-23_technical_indicators.md # Phase 8の比較結果
 │   └── images/                    # 構成図などの保存先
 └── assets/
     └── screenshots/               # README掲載画像の保存先
@@ -265,6 +269,14 @@ Workflowは[`.github/workflows/python.yml`](.github/workflows/python.yml)で管�
 - バックテストの判断は翌営業日から執行
 - ポジション補完は過去から未来への`ffill`のみ使用
 
+### Technical indicators
+
+- RSIは最初の14個の上昇幅・下落幅を算術平均し、以降をWilderの再帰式で更新
+- MACDはEMA12とEMA26の差、SignalはMACDの9日EMA、HistogramはMACDとSignalの差
+- Bollinger Bandsは20日移動平均と母標準偏差（`ddof=0`）の±2σ
+- Band Widthはバンド幅をMA20で割り、%Bは終値のバンド内位置を表す
+- すべて当日を終点とするrollingまたはEMAで計算し、未来方向の補完は行わない
+
 ### Evaluation limitations
 
 - 現在は単一の80% / 20%分割
@@ -277,12 +289,11 @@ Workflowは[`.github/workflows/python.yml`](.github/workflows/python.yml)で管�
 
 ## Future Improvements
 
-- **RSI**: 買われすぎ・売られすぎを表す特徴量
-- **MACD**: トレンドとモメンタムを捉える特徴量
 - **Optuna**: 時系列検証を前提としたハイパーパラメータ最適化
 - **XGBoost**: LightGBMとのモデル性能比較
 - **CatBoost**: 別の勾配ブースティング手法との比較
 - **Portfolio Optimization**: 複数銘柄の資産配分最適化
+- ATR、Momentum、追加のVolume Features
 - ウォークフォワード検証
 - 取引手数料、税金、スリッページ
 - ショート戦略と売買閾値の検討
