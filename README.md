@@ -50,7 +50,8 @@
 - `LGBMClassifier`による二値分類
 - 上昇クラス1の予測確率
 - Accuracy、Precision、Recall、F1、ROC-AUC
-- 特徴量重要度
+- Gain Importance（分岐による損失関数の改善量）
+- Split Importance（木の分岐に使われた回数）
 - 固定した`random_state`による再現性
 
 ### Backtesting
@@ -65,10 +66,13 @@
 
 現時点ではショート、取引手数料、税金、スリッページを考慮していません。
 
+特徴量重要度はモデル内での利用状況を表すもので、因果関係を示しません。相関した特徴量間では重要度が分散する可能性があるため、単一の学習期間における重要度だけで特徴量の削除を判断しない方針です。
+
 ### Visualization
 
 - 株価、20日移動平均線、50日移動平均線
-- Feature Importance
+- Gain / Splitを切り替えられるFeature Importanceグラフと一覧表
+- Gain上位5特徴量と、Gain・Splitそれぞれの重要度が0の特徴量数
 - StrategyとBuy & Holdの累積リターン
 - 学習・テスト期間、モデル指標、バックテスト指標
 

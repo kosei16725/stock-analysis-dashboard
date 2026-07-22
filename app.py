@@ -112,6 +112,64 @@ def render_model_metrics(model_result: ModelResult) -> None:
         column.metric(name, format_metric(model_result.metrics[name]))
 
 
+def render_feature_importance(model_result: ModelResult) -> None:
+    """Gain・Splitの特徴量重要度をグラフと表で表示する。
+
+    Args:
+        model_result: 特徴量重要度を含むモデル結果。
+
+    Returns:
+        なし。
+
+    Raises:
+        ValueError: 特徴量重要度の形式が不正な場合。
+    """
+    st.subheader("特徴量重要度")
+    importance = model_result.feature_importance
+    top_features = importance.head(5)["Feature"].tolist()
+    zero_gain_count = int((importance["Gain_Importance"] == 0).sum())
+    zero_split_count = int((importance["Split_Importance"] == 0).sum())
+
+    summary_columns = st.columns(3)
+    summary_columns[0].metric(
+        "Gain重要度0の特徴量数", f"{zero_gain_count} / {len(importance)}"
+    )
+    summary_columns[1].metric(
+        "Split重要度0の特徴量数", f"{zero_split_count} / {len(importance)}"
+    )
+    summary_columns[2].write("Gain Importance 上位5特徴量")
+    summary_columns[2].write("、".join(top_features))
+
+    gain_tab, split_tab = st.tabs(["Gain Importance", "Split Importance"])
+    with gain_tab:
+        st.plotly_chart(
+            create_feature_importance_chart(importance, "Gain"),
+            use_container_width=True,
+        )
+    with split_tab:
+        st.plotly_chart(
+            create_feature_importance_chart(importance, "Split"),
+            use_container_width=True,
+        )
+    st.dataframe(
+        importance.loc[
+            :,
+            [
+                "Feature",
+                "Gain_Importance",
+                "Gain_Percentage",
+                "Split_Importance",
+                "Split_Percentage",
+            ],
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.caption(
+        "特徴量重要度は因果関係や将来の有効性を示すものではありません。"
+    )
+
+
 def render_backtest_metrics(backtest_result: BacktestResult) -> None:
     """指定された6種類のバックテスト指標を表示する。
 
@@ -263,10 +321,7 @@ def main() -> None:
     st.success("分析が完了しました。")
     render_data_summary(model_result)
     render_model_metrics(model_result)
-    st.plotly_chart(
-        create_feature_importance_chart(model_result.feature_importance),
-        use_container_width=True,
-    )
+    render_feature_importance(model_result)
     render_backtest_metrics(backtest_result)
     st.plotly_chart(
         create_cumulative_returns_chart(

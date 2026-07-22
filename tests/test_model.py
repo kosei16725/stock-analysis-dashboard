@@ -3,10 +3,12 @@
 import numpy as np
 import pandas as pd
 import pytest
+from unittest.mock import Mock
 
 from src.constants import FEATURE_COLUMNS, TARGET_COLUMN
 from src.model import (
     calculate_metrics,
+    get_feature_importance,
     run_model_pipeline,
     separate_features_target,
     split_time_series,
@@ -197,7 +199,105 @@ def test_feature_importance_contains_every_feature(
 
     assert set(importance["Feature"]) == set(FEATURE_COLUMNS)
     assert len(importance) == len(FEATURE_COLUMNS)
-    assert importance["Importance"].is_monotonic_decreasing
+    assert importance["Gain_Importance"].is_monotonic_decreasing
+    assert set(importance["Feature"]) == set(FEATURE_COLUMNS)
+    assert importance["Importance"].equals(importance["Split_Importance"])
+
+
+def make_importance_model(
+    gain: np.ndarray,
+    split: np.ndarray,
+) -> Mock:
+    """指定したGain・Splitを返す学習済みモデルのモックを作る。"""
+    booster = Mock()
+    booster.feature_name.return_value = list(FEATURE_COLUMNS)
+    booster.feature_importance.side_effect = lambda importance_type: (
+        gain if importance_type == "gain" else split
+    )
+    model = Mock()
+    model.booster_ = booster
+    return model
+
+
+def test_gain_and_split_importance_preserve_feature_mapping() -> None:
+    """Gain・Splitと特徴量名の対応を維持したままGain降順になることを確認する。"""
+    feature_count = len(FEATURE_COLUMNS)
+    gain = np.arange(feature_count, dtype=float)
+    split = np.arange(feature_count, dtype=int)[::-1]
+    original_features = tuple(FEATURE_COLUMNS)
+
+    importance = get_feature_importance(make_importance_model(gain, split))
+
+    expected_gain = dict(zip(FEATURE_COLUMNS, gain))
+    expected_split = dict(zip(FEATURE_COLUMNS, split))
+    assert importance["Gain_Importance"].is_monotonic_decreasing
+    assert all(
+        row.Gain_Importance == expected_gain[row.Feature]
+        and row.Split_Importance == expected_split[row.Feature]
+        for row in importance.itertuples()
+    )
+    assert tuple(FEATURE_COLUMNS) == original_features
+
+
+def test_importance_ties_are_sorted_by_feature_name() -> None:
+    """Gainが同値の場合にFeature名の昇順で決定的に並ぶことを確認する。"""
+    feature_count = len(FEATURE_COLUMNS)
+    importance = get_feature_importance(
+        make_importance_model(
+            np.ones(feature_count, dtype=float),
+            np.ones(feature_count, dtype=int),
+        )
+    )
+
+    assert importance["Feature"].tolist() == sorted(FEATURE_COLUMNS)
+
+
+def test_importance_percentages_sum_to_100() -> None:
+    """重要度合計が正の場合に各Percentageの合計が100になることを確認する。"""
+    feature_count = len(FEATURE_COLUMNS)
+    importance = get_feature_importance(
+        make_importance_model(
+            np.arange(1, feature_count + 1, dtype=float),
+            np.arange(1, feature_count + 1, dtype=int),
+        )
+    )
+
+    assert importance["Gain_Percentage"].sum() == pytest.approx(100.0)
+    assert importance["Split_Percentage"].sum() == pytest.approx(100.0)
+    assert importance["Gain_Percentage"].between(0, 100).all()
+    assert importance["Split_Percentage"].between(0, 100).all()
+
+
+def test_zero_importance_has_finite_zero_percentages() -> None:
+    """重要度合計が0でもPercentageにNaNや無限値を作らないことを確認する。"""
+    feature_count = len(FEATURE_COLUMNS)
+    importance = get_feature_importance(
+        make_importance_model(
+            np.zeros(feature_count, dtype=float),
+            np.zeros(feature_count, dtype=int),
+        )
+    )
+
+    percentages = importance[["Gain_Percentage", "Split_Percentage"]]
+    assert np.isfinite(percentages.to_numpy()).all()
+    assert (percentages == 0).all().all()
+
+
+def test_importance_extraction_does_not_change_predictions_or_metrics(
+    artificial_training_data: pd.DataFrame,
+) -> None:
+    """重要度取得の追加が学習済みモデルの予測・評価結果を変えないことを確認する。"""
+    result = run_model_pipeline(artificial_training_data)
+    predictions_before = result.predictions.copy()
+    probabilities_before = result.probabilities.copy()
+    metrics_before = result.metrics.copy()
+
+    repeated_importance = get_feature_importance(result.model)
+
+    np.testing.assert_array_equal(result.predictions, predictions_before)
+    np.testing.assert_array_equal(result.probabilities, probabilities_before)
+    assert result.metrics == metrics_before
+    assert repeated_importance.equals(result.feature_importance)
 
 
 def test_too_few_rows_raise_value_error(

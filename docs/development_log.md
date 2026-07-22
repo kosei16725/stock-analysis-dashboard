@@ -308,3 +308,39 @@ Phase 8をBaselineと同じ銘柄、期間、モデル、時系列分割、Buy�
 - テストデータは39件で、単一銘柄・単一期間の結果に限られる。
 
 分類・収益指標の一部は向上した一方、ROC-AUCや最大ドローダウンなどは悪化している。このため、Phase 8が総合的または将来的にBaselineより優れているとは断定しない。実測値は`docs/experiments/2026-07-23_technical_indicators.md`へ保存し、Experiment 0 Baselineは変更していない。
+
+---
+
+# Phase 9: Feature Importance Analysis
+
+## 日付
+
+2026-07-23
+
+## 実装した内容
+
+- LightGBMのBoosterからGain ImportanceとSplit Importanceを取得する処理を追加
+- 各重要度の全体に占めるPercentageを0〜100で計算
+- Gain降順、同値時はFeature名昇順となる決定的な並び順を採用
+- 既存の`ModelResult.feature_importance`と`Importance`列を維持して後方互換性を確保
+- StreamlitへGain / Splitのタブ切り替え、重要度表、Gain上位5特徴量、各重要度の0件数を追加
+
+## 設計上の判断
+
+Gainはその特徴量による分岐が損失関数を改善した量、Splitは木の分岐に使われた回数として扱う。重要度合計が0の場合はPercentageをすべて0とし、NaNや無限値を発生させない。
+
+特徴量重要度は因果関係を示さない。また、相関した特徴量間では重要度が分散する可能性があるため、単一の学習期間の結果だけで特徴量を削除しない。複数期間・複数銘柄と予測・バックテスト指標を合わせて判断する。
+
+## 変更しなかった内容
+
+- 20列のFEATURE_COLUMNSと各特徴量の計算式
+- Target、時系列分割、LightGBMのハイパーパラメータ
+- Buy Thresholdとバックテスト処理
+- BaselineおよびPhase 8の実験記録
+
+## 動作確認結果
+
+- Gain・Splitの対応、Gain降順、同値時のFeature名順、Percentage合計、全ゼロ時、後方互換性、予測・評価値の不変性を含む全59テストが成功した。
+- 7203.T、1y、Buy Threshold 0.55で分析が正常終了し、Gain / Splitの両タブ、重要度表、Gain上位5件、各重要度の0件数が表示された。
+- Gain上位5件はReturn_5D、Volume_Change、BB_Width_20、RSI_14、MACDだった。Gain・Splitとも重要度0は0件だった。
+- 分類指標とバックテスト指標はPhase 8実験記録の値と一致し、重要度表示の追加による変化がないことを確認した。

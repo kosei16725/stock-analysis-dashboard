@@ -257,26 +257,64 @@ def calculate_metrics(
 
 
 def get_feature_importance(model: LGBMClassifier) -> pd.DataFrame:
-    """特徴量名と重要度を高い順に返す。
+    """GainとSplitの特徴量重要度をGainの高い順に返す。
 
     Args:
         model: FEATURE_COLUMNSで学習したLightGBM分類モデル。
 
     Returns:
-        Feature列とImportance列を持つDataFrame。
+        Feature、Gain_Importance、Gain_Percentage、Split_Importance、
+        Split_Percentage列を持つDataFrame。後方互換性のため、従来の
+        Split重要度を表すImportance列も保持する。
 
     Raises:
         ValueError: モデルの特徴量数がFEATURE_COLUMNSと一致しない場合。
     """
-    importances = np.asarray(model.feature_importances_)
-    if len(importances) != len(FEATURE_COLUMNS):
+    feature_names = list(model.booster_.feature_name())
+    gain_importances = np.asarray(
+        model.booster_.feature_importance(importance_type="gain"), dtype=float
+    )
+    split_importances = np.asarray(
+        model.booster_.feature_importance(importance_type="split"), dtype=int
+    )
+    if (
+        len(feature_names) != len(FEATURE_COLUMNS)
+        or len(gain_importances) != len(FEATURE_COLUMNS)
+        or len(split_importances) != len(FEATURE_COLUMNS)
+    ):
         raise ValueError("モデルの特徴量数がFEATURE_COLUMNSと一致しません。")
+    if feature_names != list(FEATURE_COLUMNS):
+        raise ValueError("モデルの特徴量名または順序がFEATURE_COLUMNSと一致しません。")
+
+    gain_total = float(gain_importances.sum())
+    split_total = int(split_importances.sum())
+    gain_percentages = (
+        gain_importances / gain_total * 100.0
+        if gain_total > 0
+        else np.zeros_like(gain_importances, dtype=float)
+    )
+    split_percentages = (
+        split_importances.astype(float) / split_total * 100.0
+        if split_total > 0
+        else np.zeros_like(split_importances, dtype=float)
+    )
 
     importance = pd.DataFrame(
-        {"Feature": list(FEATURE_COLUMNS), "Importance": importances.astype(int)}
+        {
+            "Feature": feature_names,
+            "Gain_Importance": gain_importances,
+            "Gain_Percentage": gain_percentages,
+            "Split_Importance": split_importances,
+            "Split_Percentage": split_percentages,
+            # 既存コードではImportanceをSplit重要度として利用していた。
+            "Importance": split_importances,
+        }
     )
     return importance.sort_values(
-        "Importance", ascending=False, kind="stable", ignore_index=True
+        ["Gain_Importance", "Feature"],
+        ascending=[False, True],
+        kind="stable",
+        ignore_index=True,
     )
 
 

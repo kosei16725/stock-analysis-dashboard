@@ -54,37 +54,55 @@ def create_price_chart(
     return figure
 
 
-def create_feature_importance_chart(importance: pd.DataFrame) -> go.Figure:
-    """LightGBMの特徴量重要度を横棒グラフにする。
+def create_feature_importance_chart(
+    importance: pd.DataFrame,
+    importance_type: str = "Gain",
+) -> go.Figure:
+    """LightGBMのGainまたはSplit重要度を横棒グラフにする。
 
     Args:
-        importance: Feature列とImportance列を持つDataFrame。
+        importance: Feature列とGain・Split重要度列を持つDataFrame。
+        importance_type: ``Gain``または``Split``。従来形式のDataFrameでは
+            ``Importance``列をSplit重要度として表示し、後方互換性を保つ。
 
     Returns:
         重要度が高い順に上から表示されるPlotly Figure。
 
     Raises:
-        ValueError: データが空、または必要列が不足している場合。
+        ValueError: データが空、種類が不正、または必要列が不足している場合。
     """
     if importance.empty:
         raise ValueError("表示できる特徴量重要度がありません。")
-    required = {"Feature", "Importance"}
+    if importance_type not in {"Gain", "Split"}:
+        raise ValueError("importance_typeはGainまたはSplitを指定してください。")
+
+    value_column = f"{importance_type}_Importance"
+    display_type = importance_type
+    if value_column not in importance.columns and "Importance" in importance.columns:
+        value_column = "Importance"
+        # 旧Importance列はLightGBM既定のSplit重要度として保存されていた。
+        display_type = "Split"
+    required = {"Feature", value_column}
     missing = sorted(required.difference(importance.columns))
     if missing:
         raise ValueError(f"特徴量重要度に必要な列がありません: {', '.join(missing)}")
 
-    ordered = importance.sort_values("Importance", ascending=False, kind="stable")
+    ordered = importance.sort_values(
+        [value_column, "Feature"],
+        ascending=[False, True],
+        kind="stable",
+    )
     figure = go.Figure(
         go.Bar(
-            x=ordered["Importance"],
+            x=ordered[value_column],
             y=ordered["Feature"],
             orientation="h",
-            name="重要度",
+            name=f"{display_type} Importance",
         )
     )
     figure.update_layout(
-        title="Feature Importance",
-        xaxis_title="重要度",
+        title=f"Feature Importance ({display_type})",
+        xaxis_title=f"{display_type} Importance",
         yaxis_title="特徴量",
         template="plotly_white",
     )
