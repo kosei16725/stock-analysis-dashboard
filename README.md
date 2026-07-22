@@ -129,6 +129,8 @@ stock-analysis-dashboard/
 ├── docs/
 │   ├── system_design.md
 │   ├── development_log.md
+│   ├── experiments/               # モデル・戦略の実験記録
+│   │   └── 2026-07-23_baseline.md # Experiment 0の比較基準
 │   └── images/                    # 構成図などの保存先
 └── assets/
     └── screenshots/               # README掲載画像の保存先

@@ -253,3 +253,11 @@ Streamlitへの予測・バックテスト表示と、取引コストを考慮�
 ## 次に行うこと
 
 ブラウザでの最終表示確認、スクリーンショット、公開設定、取引コストやウォークフォワード検証を検討する。
+
+---
+
+## Experiment Records
+
+- Baseline experiment added: `docs/experiments/2026-07-23_baseline.md`
+- 現行のLightGBM分類指標、バックテスト指標、特徴量一覧をExperiment 0として記録した。
+- RSI、MACD、Optuna、XGBoostなどの改善案は、このBaselineと同じ条件で比較する。
