@@ -5,5 +5,7 @@ numpy==2.0.2
 plotly==6.1.2
 yfinance==0.2.61
 pytest==8.3.5
+scikit-learn==1.6.1
+lightgbm==4.6.0
 # Apple標準Python 3.9（LibreSSL）でurllib3 v2の警告を避ける。
 urllib3==1.26.20
