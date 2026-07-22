@@ -2,7 +2,7 @@
 
 ## 概要
 
-Yahoo Financeからトヨタ自動車（7203.T）の過去1年の日足株価を取得し、終値、20日移動平均線、50日移動平均線を確認できるStreamlitアプリです。現在は未来情報を含まない特徴量、時系列分割、LightGBMの学習・評価、予測確率を使った簡易バックテストまで実装しています。モデルとバックテスト結果の画面表示は今後実装予定です。
+Yahoo Financeから株価を取得し、特徴量作成、時系列分割、LightGBMの学習・評価、予測確率を使った簡易バックテストまでブラウザから実行できるStreamlitアプリです。
 
 ## 開発目的
 
@@ -25,8 +25,10 @@ Yahoo Financeからトヨタ自動車（7203.T）の過去1年の日足株価を
 - Accuracy、Precision、Recall、F1、ROC-AUCによる評価
 - 上昇確率0.55以上をBuy、それ未満をCashとするロング戦略
 - 予測翌営業日の執行、Buy & Hold比較、リターン・リスク・売買指標
+- 銘柄コード、取得期間、Buy閾値を指定できる分析フォーム
+- モデル評価・バックテスト指標と3種類のPlotlyグラフ
 
-予測・バックテスト結果のStreamlit表示は今後実装予定です。
+ショート、取引コスト、ウォークフォワード検証は今後実装予定です。
 
 ## 使用技術
 
@@ -39,7 +41,7 @@ Yahoo Financeからトヨタ自動車（7203.T）の過去1年の日足株価を
 
 ## システム構成
 
-`app.py`（画面）から、`src/data_loader.py`（取得・整形）と`src/visualization.py`（グラフ）を呼び出します。分析処理は `src/features.py` が学習用DataFrameを作り、`src/model.py` が時系列分割、学習、予測、評価、`src/backtest.py` が翌営業日執行の売買検証を担当します。現段階ではまだUIから学習・バックテスト処理を呼び出しません。詳細は [docs/system_design.md](docs/system_design.md) を参照してください。
+`app.py`（画面）が入力を受け取り、`src/data_loader.py`、`src/features.py`、`src/model.py`、`src/backtest.py`を順番に呼び出します。グラフは`src/visualization.py`が生成します。詳細は [docs/system_design.md](docs/system_design.md) を参照してください。
 
 ## ディレクトリ構成
 
@@ -87,7 +89,17 @@ python -m pytest
 
 ## 画面イメージ
 
-スクリーンショットはアプリ画面の最終調整後に `assets/screenshots/` へ追加予定です。
+画面は次の順に構成しています。
+
+1. 銘柄コード、取得期間、Buy閾値と「分析開始」ボタン
+2. 株価・20日・50日移動平均線
+3. 学習件数、テスト件数、学習期間、テスト期間
+4. Accuracy、Precision、Recall、F1、ROC-AUC
+5. Feature Importance
+6. Total Return、Annual Return、Sharpe Ratio、Max Drawdown、Win Rate、Total Trades
+7. StrategyとBuy & Holdの累積リターン比較
+
+実際のスクリーンショットは公開前に `assets/screenshots/` へ追加予定です。
 
 ## 工夫した点
 
@@ -101,6 +113,7 @@ python -m pytest
 - モデル、分割データ、予測、評価、重要度を小さなdataclassで一つの結果として扱えるようにしました。
 - 予測日のシグナルを実際の取引日カレンダー上で翌営業日へ移し、同日のリターンへ適用しています。
 - 戦略とBuy & Holdを同じ期間で比較し、複利リターンとリスク指標を確認できます。
+- 外部取得、特徴量、学習、バックテストの失敗を段階別に画面表示し、アプリ全体の異常終了を防ぎました。
 
 ## 苦労した点と解決方法
 
@@ -120,7 +133,7 @@ LightGBMは表形式データで非線形な関係を扱え、特徴量重要度
 - ウォークフォワード検証とハイパーパラメータ検討
 - 手数料、税金、スリッページを考慮したバックテスト
 - ショートや売買閾値の検討
-- 予測、評価指標、特徴量重要度のStreamlit表示
+- 入力候補の選択式UI、結果のダウンロード
 - Streamlit Community Cloud等への公開
 
 ## 免責事項
