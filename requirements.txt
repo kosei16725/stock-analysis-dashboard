@@ -1,0 +1,9 @@
+# Python 3.9以上を想定。第1段階で実際に使用する依存関係のみを記載する。
+streamlit==1.45.1
+pandas==2.2.3
+numpy==2.0.2
+plotly==6.1.2
+yfinance==0.2.61
+pytest==8.3.5
+# Apple標準Python 3.9（LibreSSL）でurllib3 v2の警告を避ける。
+urllib3==1.26.20
