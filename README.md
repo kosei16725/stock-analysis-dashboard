@@ -1,145 +1,274 @@
 # Stock Analysis Dashboard
 
-## 概要
+株価データの取得、特徴量生成、LightGBMによる翌営業日の方向予測、時系列評価、バックテストまでをブラウザ上で実行できるStreamlitアプリです。
 
-Yahoo Financeから株価を取得し、特徴量作成、時系列分割、LightGBMの学習・評価、予測確率を使った簡易バックテストまでブラウザから実行できるStreamlitアプリです。
+就職活動用のポートフォリオとして、データ処理、機械学習、時系列データの評価、Web UI、自動テスト、設計文書を一つのプロジェクトにまとめています。
 
-## 開発目的
+> [!WARNING]
+> 本プロジェクトは学習・情報提供を目的としています。投資判断を推奨・保証するものではなく、過去の評価結果は将来の価格変動や利益を保証しません。
 
-就職活動用ポートフォリオとして、要件整理、Pythonによるデータ処理、外部データ取得、Webアプリ、テスト、Git/GitHub、文書化、公開までの開発過程を説明できる成果物を目指します。
+## Project Overview
 
-## 主な機能
+ユーザーが銘柄コード、取得期間、Buy判定の確率閾値を入力すると、以下の処理を順番に実行します。
 
-- yfinanceによる7203.Tの日足データ取得
-- 終値、20日・50日移動平均線の計算とPlotly表示
-- 取得件数、開始日、終了日の表示
-- ローディング、空データ、通信エラーの画面表示
-- 通信に依存しないpytest
-- Daily Return、5日・20日リターン
+1. Yahoo Financeから日足株価を取得
+2. 当日までの情報だけを使って特徴量を生成
+3. 翌営業日の終値が上昇したかを目的変数として作成
+4. 過去80%を学習、未来20%をテストとして時系列分割
+5. LightGBMで上昇・非上昇を分類
+6. 分類指標と特徴量重要度を計算
+7. 予測確率からBuy/Cashシグナルを生成
+8. 翌営業日執行のバックテストをBuy & Holdと比較
+
+ランダム分割は使用せず、未来のデータが過去の学習へ混入しない設計を重視しています。
+
+## Features
+
+### Interactive dashboard
+
+- 銘柄コード入力（デフォルト: `7203.T`）
+- 取得期間入力（デフォルト: `1y`）
+- Buy閾値入力（デフォルト: `0.55`）
+- 処理段階ごとのローディング表示とエラーメッセージ
+
+### Data and feature engineering
+
+- yfinanceによる日足株価取得
+- yfinanceのMultiIndex列への対応
+- Daily Return、5日リターン、20日リターン
 - MA5、MA20、MA50、MA20乖離率
 - 20日ボラティリティ、出来高変化率
-- 翌営業日の終値が上昇したかを表すTarget（上昇=1、それ以外=0）
-- 特徴量とTargetに必要な行だけを対象にした欠損処理
-- 過去80%を学習、未来20%をテストにする時系列分割
-- LightGBMによる分類、上昇確率、特徴量重要度
-- Accuracy、Precision、Recall、F1、ROC-AUCによる評価
-- 上昇確率0.55以上をBuy、それ未満をCashとするロング戦略
-- 予測翌営業日の執行、Buy & Hold比較、リターン・リスク・売買指標
-- 銘柄コード、取得期間、Buy閾値を指定できる分析フォーム
-- モデル評価・バックテスト指標と3種類のPlotlyグラフ
+- 翌営業日の上昇を表すTarget
+- 欠損値・無限値・列不足・空データの検証
 
-ショート、取引コスト、ウォークフォワード検証は今後実装予定です。
+### Machine learning
 
-## 使用技術
+- 日付昇順を維持した80% / 20%の時系列分割
+- `LGBMClassifier`による二値分類
+- 上昇クラス1の予測確率
+- Accuracy、Precision、Recall、F1、ROC-AUC
+- 特徴量重要度
+- 固定した`random_state`による再現性
 
-- Python 3.9以上
-- Streamlit / pandas / NumPy / Plotly / yfinance
-- scikit-learn / LightGBM
-- pytest
+### Backtesting
 
-依存バージョンはPython 3.9とmacOS ARM環境で動作確認した値に固定しています。
+- 予測確率が閾値以上ならBuy、それ以外はCash
+- シグナルは予測日の翌営業日から執行
+- 次のシグナルまで直前のポジションを維持
+- StrategyとBuy & Holdの同期間比較
+- Total Return、Annual Return、Annual Volatility
+- Sharpe Ratio、Max Drawdown
+- Win Rate、Average Gain、Average Loss、Total Trades
 
-## システム構成
+現時点ではショート、取引手数料、税金、スリッページを考慮していません。
 
-`app.py`（画面）が入力を受け取り、`src/data_loader.py`、`src/features.py`、`src/model.py`、`src/backtest.py`を順番に呼び出します。グラフは`src/visualization.py`が生成します。詳細は [docs/system_design.md](docs/system_design.md) を参照してください。
+### Visualization
 
-## ディレクトリ構成
+- 株価、20日移動平均線、50日移動平均線
+- Feature Importance
+- StrategyとBuy & Holdの累積リターン
+- 学習・テスト期間、モデル指標、バックテスト指標
+
+## System Architecture
+
+```mermaid
+flowchart TD
+    U[User] --> UI[Streamlit UI<br/>app.py]
+    UI --> DL[Data Loader<br/>yfinance]
+    DL --> VD[Validation & Normalization]
+    VD --> FE[Feature Engineering<br/>src/features.py]
+    FE --> TS[Time-series Split<br/>Past 80% / Future 20%]
+    TS --> ML[LightGBM Training<br/>src/model.py]
+    ML --> MP[Class & Probability Prediction]
+    MP --> ME[Model Metrics]
+    MP --> BT[Next-day Backtest<br/>src/backtest.py]
+    BT --> BM[Buy & Hold Comparison]
+    BT --> BR[Return & Risk Metrics]
+    ME --> VIS[Plotly Visualization]
+    ML --> VIS
+    BM --> VIS
+    BR --> VIS
+    VIS --> UI
+
+    TEST[pytest] -.-> DL
+    TEST -.-> FE
+    TEST -.-> ML
+    TEST -.-> BT
+```
+
+詳細な設計と未来情報漏洩を防ぐ方針は[システム設計書](docs/system_design.md)を参照してください。
+
+## Directory Structure
 
 ```text
 stock-analysis-dashboard/
-├── app.py
-├── config.py
-├── src/                 # 取得・計算・可視化
-├── tests/               # 自動テスト
-├── data/                # raw / processed / models
-├── docs/                # 設計書・開発記録
-├── assets/screenshots/  # README掲載用画像
-├── requirements.txt
+├── app.py                         # Streamlit UIと処理フロー
+├── config.py                      # デフォルト銘柄・期間・移動平均設定
+├── requirements.txt               # 固定したPython依存関係
 ├── README.md
-└── LICENSE
+├── LICENSE
+├── src/
+│   ├── __init__.py
+│   ├── constants.py               # 列名・特徴量名・固定値
+│   ├── data_loader.py             # yfinance取得・検証・整形
+│   ├── features.py                # 特徴量・Target・学習データ
+│   ├── model.py                   # 時系列分割・LightGBM・評価
+│   ├── backtest.py                # 翌営業日執行バックテスト
+│   ├── visualization.py           # Plotlyグラフ
+│   └── utils.py                   # 共通の入力検証
+├── tests/
+│   ├── __init__.py
+│   ├── test_data_loader.py
+│   ├── test_features.py
+│   ├── test_model.py
+│   └── test_backtest.py
+├── data/
+│   ├── raw/                       # 元データ保存用（現在は未使用）
+│   ├── processed/                 # 加工データ保存用（現在は未使用）
+│   └── models/                    # モデル保存用（現在は未使用）
+├── docs/
+│   ├── system_design.md
+│   ├── development_log.md
+│   └── images/                    # 構成図などの保存先
+└── assets/
+    └── screenshots/               # README掲載画像の保存先
 ```
 
-## セットアップ方法
+## Tech Stack
 
-macOSのターミナルで次を実行します。仮想環境により、このプロジェクト用のライブラリを他のPython環境から分離できます。
+| Category | Technology | Purpose |
+|---|---|---|
+| Language | Python 3.9+ | データ処理、学習、Webアプリ |
+| Web UI | Streamlit | 入力フォームと分析結果表示 |
+| Data | pandas, NumPy | 時系列データの加工と計算 |
+| Market Data | yfinance | APIキー不要の株価取得 |
+| Machine Learning | LightGBM, scikit-learn | 分類モデルと評価指標 |
+| Visualization | Plotly | インタラクティブなグラフ |
+| Testing | pytest | 通信非依存の自動テスト |
+| Version Control | Git / GitHub | 変更履歴と公開管理 |
+
+依存バージョンは[requirements.txt](requirements.txt)で固定しています。
+
+## Installation
+
+### Prerequisites
+
+- Python 3.9以上
+- Git
+- インターネット接続（株価取得時）
+
+### Setup
 
 ```bash
+git clone <YOUR_REPOSITORY_URL>
 cd stock-analysis-dashboard
+
 python3 -m venv .venv
 source .venv/bin/activate
+
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-## 起動方法
+Windows PowerShellで仮想環境を有効化する場合：
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+## Usage
+
+仮想環境を有効化した状態で起動します。
 
 ```bash
 streamlit run app.py
 ```
 
-表示されたLocal URL（通常は `http://localhost:8501`）をブラウザで開きます。
+ブラウザで通常`http://localhost:8501`が開きます。
 
-## テスト方法
+1. 銘柄コードをYahoo Finance形式で入力します（例: `7203.T`、`AAPL`）。
+2. 取得期間を入力します（例: `6mo`、`1y`、`2y`、`5y`）。
+3. Buy閾値を指定します。
+4. 「分析開始」を押します。
+5. 株価、学習期間、モデル評価、バックテスト結果を確認します。
+
+短い取得期間では、MA50や時系列分割に必要なデータが不足して学習できない場合があります。
+
+## Testing
+
+テストは固定した人工DataFrameとモックを中心に構成しており、主要テストはYahoo Financeへの通信に依存しません。
+
+全テストを実行：
 
 ```bash
-python -m pytest
+.venv/bin/python -m pytest -q
 ```
 
-主要テストはyfinanceをモックするため、インターネット接続に依存しません。
+Pythonファイルの構文・import可能性を確認：
 
-## 画面イメージ
+```bash
+.venv/bin/python -m compileall -q app.py config.py src tests
+```
 
-画面は次の順に構成しています。
+コミット前の空白エラーを確認：
 
-1. 銘柄コード、取得期間、Buy閾値と「分析開始」ボタン
-2. 株価・20日・50日移動平均線
-3. 学習件数、テスト件数、学習期間、テスト期間
-4. Accuracy、Precision、Recall、F1、ROC-AUC
-5. Feature Importance
-6. Total Return、Annual Return、Sharpe Ratio、Max Drawdown、Win Rate、Total Trades
-7. StrategyとBuy & Holdの累積リターン比較
+```bash
+git diff --check
+```
 
-実際のスクリーンショットは公開前に `assets/screenshots/` へ追加予定です。
+Windowsでは`.venv/bin/python`の代わりに`.venv\Scripts\python.exe`を使用してください。
 
-## 工夫した点
+## Screenshots
 
-- UI、データ取得、可視化の役割を分離しました。
-- yfinanceのMultiIndex形式にも対応しました。
-- 空データや通信失敗を明示的な例外にし、アプリ全体の異常終了を防ぎました。
-- 依存ライブラリを第1段階で必要なものに絞りました。
-- 特徴量計算では当日を終点とする処理だけを使い、翌日情報をTarget以外へ混入させない設計にしました。
-- 欠損処理の対象列を特徴量とTargetに限定し、無関係な列の欠損による行削除を防ぎました。
-- 日付で昇順に並べた後、過去側だけを学習に使い、未来側を評価に残しました。
-- モデル、分割データ、予測、評価、重要度を小さなdataclassで一つの結果として扱えるようにしました。
-- 予測日のシグナルを実際の取引日カレンダー上で翌営業日へ移し、同日のリターンへ適用しています。
-- 戦略とBuy & Holdを同じ期間で比較し、複利リターンとリスク指標を確認できます。
-- 外部取得、特徴量、学習、バックテストの失敗を段階別に画面表示し、アプリ全体の異常終了を防ぎました。
+公開用画像は`assets/screenshots/`へ配置します。以下は追加予定ファイルのプレースホルダーです。
 
-## 苦労した点と解決方法
+| Screen | Placeholder path | Status |
+|---|---|---|
+| Dashboard overview | `assets/screenshots/dashboard-overview.png` | To be added |
+| Model evaluation and feature importance | `assets/screenshots/model-evaluation.png` | To be added |
+| Backtest and cumulative returns | `assets/screenshots/backtest-results.png` | To be added |
 
-yfinanceはバージョンや取得銘柄数により列構造が変わる場合があります。列階層から対象銘柄を探して単一階層へ統一する処理を設けました。実際の検証内容は [docs/development_log.md](docs/development_log.md) に記録します。
+画像追加後は、以下のコメントをMarkdown画像へ置き換える予定です。
 
-## 機械学習における注意点
+```markdown
+![Dashboard overview](assets/screenshots/dashboard-overview.png)
+```
 
-第2段階の特徴量は当日までの情報だけで計算し、翌営業日終値はTargetの作成だけに使用しています。株価では未来のデータを過去の学習へ混ぜられないため、ランダム分割を使わず、過去80%を学習、未来20%をテストにしています。
+## Design Notes
 
-LightGBMは表形式データで非線形な関係を扱え、特徴量重要度を取得できるため採用しました。現在はAccuracy、Precision、Recall、F1、ROC-AUCを確認できます。ただし、限られた期間と単純な1回分割による結果であり、将来の予測性能や利益を保証するものではありません。テスト期間が単一クラスの場合、定義できないROC-AUCは `None` とします。
+### Preventing data leakage
 
-バックテストは上昇確率が0.55以上ならBuy、それ以外はCashとし、判断の翌営業日に執行します。予測日が非連続でも全取引日を残し、次のシグナルが執行されるまでは直前のBuyまたはCashを維持します。最初の執行前はCashで、未来方向への補完は行いません。ショート、取引手数料、税金、スリッページはまだ考慮していません。Total Return、Annual Return、Annual Volatility、Sharpe Ratio、Max Drawdown、Win Rate、Average Gain、Average Loss、Total Tradesを算出します。過去データ上の結果であり、将来の利益を保証するものではありません。
+- 特徴量は当日までの価格・出来高だけから計算
+- 翌営業日の終値はTarget作成だけに使用
+- 分割前に日付昇順へ並べ、過去を学習、未来をテストに使用
+- 標準化などテストデータへ適合する前処理は未使用
+- バックテストの判断は翌営業日から執行
+- ポジション補完は過去から未来への`ffill`のみ使用
 
-## 今後の改善予定
+### Evaluation limitations
 
-- RSIなどの追加特徴量
-- ウォークフォワード検証とハイパーパラメータ検討
-- 手数料、税金、スリッページを考慮したバックテスト
-- ショートや売買閾値の検討
-- 入力候補の選択式UI、結果のダウンロード
-- Streamlit Community Cloud等への公開
+- 現在は単一の80% / 20%分割
+- ハイパーパラメータ探索は未実装
+- 取引コストとスリッページは未考慮
+- バックテスト結果は銘柄、期間、閾値に依存
+- 高い分類精度やバックテスト収益を保証しない
 
-## 免責事項
+開発中に発生した問題と解決方法は[開発ログ](docs/development_log.md)に記録しています。
 
-本アプリは学習・情報提供を目的としており、投資判断を推奨・保証するものではありません。表示内容の正確性や完全性を保証せず、投資に関する最終判断は利用者自身の責任で行ってください。
+## Future Improvements
 
-## ライセンス
+- **RSI**: 買われすぎ・売られすぎを表す特徴量
+- **MACD**: トレンドとモメンタムを捉える特徴量
+- **Optuna**: 時系列検証を前提としたハイパーパラメータ最適化
+- **XGBoost**: LightGBMとのモデル性能比較
+- **CatBoost**: 別の勾配ブースティング手法との比較
+- **Portfolio Optimization**: 複数銘柄の資産配分最適化
+- ウォークフォワード検証
+- 取引手数料、税金、スリッページ
+- ショート戦略と売買閾値の検討
+- 結果のCSVダウンロード
+- Streamlit Community Cloud等へのデプロイ
 
-MIT Licenseです。詳細は [LICENSE](LICENSE) を参照してください。
+## License
+
+このプロジェクトはMIT Licenseで公開します。詳細は[LICENSE](LICENSE)を参照してください。
