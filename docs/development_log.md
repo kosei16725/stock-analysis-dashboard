@@ -369,3 +369,29 @@ Gainはその特徴量による分岐が損失関数を改善した量、Split�
 7203.T、1y、Buy Threshold 0.55で、分割直後の学習154件から境界1件を除外した153件、テスト39件を比較した。Top 15とBaseline 9のAccuracyは0.4615、Top 15のF1は0.6038、Baseline 9のROC-AUCは0.4048だった。All 20はTotal Return 4.35%とSharpe Ratio 1.2789だった。指標ごとに最も高いセットが異なるため、特徴量削減が総合的・将来的に優れているとは断定しない。
 
 詳細は`docs/experiments/2026-07-23_feature_selection.md`へ記録した。単一銘柄・短期間の結果であり、複数銘柄・複数期間での検証が必要である。
+
+---
+
+# Phase 11: Walk-Forward Validation
+
+## 日付
+
+2026-07-23
+
+## 実装した内容
+
+- `src/walk_forward.py`へexpanding windowのFold作成、Fold別評価、特徴量セット別集約を実装した。
+- 既定条件をinitial train 100件、test 20件、step 20件とし、不完全な末尾Foldを除外した。
+- Phase 10の境界パージ、Gain順位、特徴量セット、スキーマ検証、バックテスト期間制限を再利用した。
+- FoldごとにTop 15 / Top 10を学習期間だけで再選択し、All 20 / Baseline 9と同一期間で比較した。
+- 平均、標本標準偏差、プラスリターンFold数・割合を集約した。1 Foldだけの場合の標準偏差は0.0とする。
+
+## データリーク防止
+
+各Foldは日付昇順で、train末尾がtest開始より前になる。分割後に学習末尾1件を除外し、Gainランキングと4モデルへ同じパージ済みtrainを渡す。test特徴量、test Target、境界Targetは順位決定へ渡さない。バックテストはFold末尾予測の実際の翌取引日までに限定する。
+
+## 実データ確認
+
+7203.Tの2年価格488件から学習用438件を作り、100/20/20で16 Foldを評価した。平均AccuracyはAll 20が0.5063、Top 10が0.5031、Top 15とBaseline 9が0.4781だった。平均Total ReturnはTop 10が1.15%、All 20が0.86%、Top 15が0.06%、Baseline 9が-0.68%だった。
+
+標準偏差の小ささではTop 15がAccuracy、Precision、F1、Total Return、Max Drawdownで最小だった。一方、Recall、ROC-AUC、Sharpe Ratio、Win Rateなどは別セットの標準偏差が小さく、すべての観点で一つのセットが最も安定していたわけではない。詳細は`docs/experiments/2026-07-23_walk_forward.md`へ記録する。

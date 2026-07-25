@@ -54,6 +54,7 @@
 - Split Importance（木の分岐に使われた回数）
 - 学習期間のGain順位によるAll 20 / Top 15 / Top 10 / Baseline 9比較実験
 - 翌営業日Targetがテスト初日を参照する境界サンプル1件を実験学習データから除外
+- expanding windowでFoldごとにGain順位を再計算するウォークフォワード検証
 - 固定した`random_state`による再現性
 
 ### Backtesting
@@ -123,6 +124,7 @@ stock-analysis-dashboard/
 │   ├── features.py                # 特徴量・Target・学習データ
 │   ├── model.py                   # 時系列分割・LightGBM・評価
 │   ├── feature_selection.py       # 学習期間だけで行う特徴量セット比較
+│   ├── walk_forward.py            # expanding windowによる複数Fold検証
 │   ├── backtest.py                # 翌営業日執行バックテスト
 │   ├── visualization.py           # Plotlyグラフ
 │   └── utils.py                   # 共通の入力検証
@@ -132,6 +134,7 @@ stock-analysis-dashboard/
 │   ├── test_features.py
 │   ├── test_model.py
 │   ├── test_feature_selection.py
+│   ├── test_walk_forward.py
 │   ├── test_visualization.py
 │   └── test_backtest.py
 ├── data/
@@ -144,7 +147,8 @@ stock-analysis-dashboard/
 │   ├── experiments/               # モデル・戦略の実験記録
 │   │   ├── 2026-07-23_baseline.md # Experiment 0の比較基準
 │   │   ├── 2026-07-23_technical_indicators.md # Phase 8の比較結果
-│   │   └── 2026-07-23_feature_selection.md # Phase 10の比較結果
+│   │   ├── 2026-07-23_feature_selection.md # Phase 10の比較結果
+│   │   └── 2026-07-23_walk_forward.md # Phase 11の複数Fold検証
 │   └── images/                    # 構成図などの保存先
 └── assets/
     └── screenshots/               # README掲載画像の保存先
@@ -287,9 +291,11 @@ Workflowは[`.github/workflows/python.yml`](.github/workflows/python.yml)で管�
 - Band Widthはバンド幅をMA20で割り、%Bは終値のバンド内位置を表す
 - すべて当日を終点とするrollingまたはEMAで計算し、未来方向の補完は行わない
 
-### Evaluation limitations
+### Evaluation
 
-- 現在は単一の80% / 20%分割
+- Streamlit画面は単一の80% / 20%分割を表示
+- 実験モジュールではexpanding windowのウォークフォワード検証に対応
+- Foldごとに境界Targetを除外し、学習期間だけでGain順位を再計算
 - ハイパーパラメータ探索は未実装
 - 取引コストとスリッページは未考慮
 - バックテスト結果は銘柄、期間、閾値に依存
@@ -304,7 +310,7 @@ Workflowは[`.github/workflows/python.yml`](.github/workflows/python.yml)で管�
 - **CatBoost**: 別の勾配ブースティング手法との比較
 - **Portfolio Optimization**: 複数銘柄の資産配分最適化
 - ATR、Momentum、追加のVolume Features
-- ウォークフォワード検証
+- 複数銘柄・複数期間でのウォークフォワード再検証
 - 取引手数料、税金、スリッページ
 - ショート戦略と売買閾値の検討
 - 結果のCSVダウンロード

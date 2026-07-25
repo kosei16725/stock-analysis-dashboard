@@ -100,6 +100,18 @@ flowchart LR
 
 順位決定時にテスト特徴量、テストTarget、テスト初日の価格から作られる境界Target、将来リターンを参照しない。ランキング用モデルは順位作成だけに使い、その予測を評価へ流用しない。この実験はStreamlit UIへ統合せず、再現可能な実験コードとして分離する。
 
+## ウォークフォワード検証の流れ
+
+1. `walk_forward.py`が日付昇順のデータからexpanding window Foldを作る。
+2. Fold 1は先頭100件、以降は既定で20件ずつ学習窓を拡張し、各Foldの直後20件をテストにする。不完全な末尾Foldは使用しない。
+3. 各Foldの分割直後に学習末尾1件をパージし、翌営業日Targetがテスト初日の価格を参照しないようにする。
+4. パージ済み学習データだけでFold固有のGain順位を計算し、Top 15 / Top 10を毎回選び直す。
+5. All 20 / Top 15 / Top 10 / Baseline 9を同じパージ済みtrainと同じtestへ適用する。
+6. バックテスト価格はFoldの最初の予測日から最後の予測日の翌取引日までに制限する。
+7. Fold別の分類・バックテスト結果を作り、特徴量セットごとの平均、標本標準偏差、プラスリターンFold数を集約する。
+
+後のFoldが過去Foldのテスト期間を学習へ取り込むことはexpanding windowの仕様として許可するが、そのFoldのテスト開始日以降は学習・順位決定へ含めない。ウォークフォワード実験はStreamlitへ統合せず、通信非依存テストと独立した実験記録で管理する。
+
 ## Streamlit画面の処理フロー
 
 1. 利用者が銘柄コード、取得期間、Buy閾値を入力する。
@@ -138,6 +150,7 @@ Total TradesはCashからBuyへ切り替わった回数とする。Win RateはBu
 | `src/features.py` | 過去情報による特徴量、Target、学習用データ |
 | `src/model.py` | 時系列分割、LightGBM学習、予測、評価、特徴量重要度 |
 | `src/feature_selection.py` | 学習期間のGain順位、特徴量セット再学習、分類・バックテスト比較 |
+| `src/walk_forward.py` | expanding window Fold作成、Fold別評価、平均・標準偏差集約 |
 | `src/backtest.py` | 翌営業日執行、Buy & Hold比較、バックテスト指標 |
 | `tests/` | 通信非依存の自動テスト |
 
