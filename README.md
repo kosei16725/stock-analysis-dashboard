@@ -56,6 +56,7 @@
 - 翌営業日Targetがテスト初日を参照する境界サンプル1件を実験学習データから除外
 - expanding windowでFoldごとにGain順位を再計算するウォークフォワード検証
 - 5銘柄へ同一条件のウォークフォワード検証を適用する複数銘柄実験
+- Outer TestをTrial選択に使わないOptuna Nested Walk Forward最適化
 - 固定した`random_state`による再現性
 
 ### Backtesting
@@ -127,6 +128,7 @@ stock-analysis-dashboard/
 │   ├── feature_selection.py       # 学習期間だけで行う特徴量セット比較
 │   ├── walk_forward.py            # expanding windowによる複数Fold検証
 │   ├── multi_symbol_experiment.py # 複数銘柄の実行・集約・CSV出力
+│   ├── hyperparameter_optimization.py # Optuna Nested Walk Forward
 │   ├── backtest.py                # 翌営業日執行バックテスト
 │   ├── visualization.py           # Plotlyグラフ
 │   └── utils.py                   # 共通の入力検証
@@ -138,6 +140,7 @@ stock-analysis-dashboard/
 │   ├── test_feature_selection.py
 │   ├── test_walk_forward.py
 │   ├── test_multi_symbol_experiment.py
+│   ├── test_hyperparameter_optimization.py
 │   ├── test_visualization.py
 │   └── test_backtest.py
 ├── data/
@@ -153,7 +156,8 @@ stock-analysis-dashboard/
 │   │   ├── 2026-07-23_technical_indicators.md # Phase 8の比較結果
 │   │   ├── 2026-07-23_feature_selection.md # Phase 10の比較結果
 │   │   ├── 2026-07-23_walk_forward.md # Phase 11の複数Fold検証
-│   │   └── 2026-07-24_multi_symbol.md # Phase 12の5銘柄検証
+│   │   ├── 2026-07-24_multi_symbol.md # Phase 12の5銘柄検証
+│   │   └── 2026-07-25_optuna.md  # Phase 13のNested最適化
 │   └── images/                    # 構成図などの保存先
 └── assets/
     └── screenshots/               # README掲載画像の保存先
@@ -168,6 +172,7 @@ stock-analysis-dashboard/
 | Data | pandas, NumPy | 時系列データの加工と計算 |
 | Market Data | yfinance | APIキー不要の株価取得 |
 | Machine Learning | LightGBM, scikit-learn | 分類モデルと評価指標 |
+| Optimization | Optuna | Nested Walk Forward内のパラメータ探索 |
 | Visualization | Plotly | インタラクティブなグラフ |
 | Testing | pytest | 通信非依存の自動テスト |
 | Version Control | Git / GitHub | 変更履歴と公開管理 |

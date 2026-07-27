@@ -131,6 +131,18 @@ flowchart LR
 
 各銘柄は独立して評価し、全銘柄に2年、initial train 100件、test 20件、step 20件、Buy Threshold 0.55を適用する。複数銘柄を結合して学習する方式ではないため、ある銘柄の将来情報が別銘柄の学習へ入ることはない。
 
+## Optuna Nested Walk Forwardの流れ
+
+1. Phase 11の`create_walk_forward_splits`でOuter Foldを作り、学習末尾の境界Targetをパージする。
+2. 各Outer学習期間だけから別のexpanding-window Inner Foldを作る。Inner Foldでも境界Targetをパージする。
+3. Outer Foldごとに独立したOptuna Studyを作り、Inner Foldの平均Penalty付きSharpe Ratioを最大化する。
+4. Trialでは取引回数5未満、無効なSharpe Ratio、Fold評価失敗へPenaltyを適用する。
+5. Inner StudyのBest Parameterを決定した後、初めて未使用のOuter Testへ適用する。
+6. 同じOuter Testで既定モデルとTunedモデルを比較し、全Outer Foldの平均・標準偏差を集約する。
+7. Trial一覧、各Outer FoldのBest Parameter、最新Outer学習期間だけから選んだ将来利用候補を`data/results/`へ保存する。
+
+Outer Testの特徴量、Target、価格、評価指標はOptuna目的関数へ渡さない。将来利用候補はOuter Test成績では選ばず、最も新しく学習期間が長いOuter FoldのInner Studyから取得する。したがって、Nested評価と候補パラメータ選択の役割を分離する。
+
 ## 予測からバックテストまでの流れ
 
 1. `model.py` がテスト期間について上昇クラス1の予測確率を返す。
@@ -162,6 +174,7 @@ Total TradesはCashからBuyへ切り替わった回数とする。Win RateはBu
 | `src/feature_selection.py` | 学習期間のGain順位、特徴量セット再学習、分類・バックテスト比較 |
 | `src/walk_forward.py` | expanding window Fold作成、Fold別評価、平均・標準偏差集約 |
 | `src/multi_symbol_experiment.py` | 複数銘柄の取得、Phase 11呼び出し、失敗管理、総合集約、CSV出力 |
+| `src/hyperparameter_optimization.py` | Optuna Study、Nested Walk Forward、Penalty、結果・PNG保存 |
 | `src/backtest.py` | 翌営業日執行、Buy & Hold比較、バックテスト指標 |
 | `tests/` | 通信非依存の自動テスト |
 

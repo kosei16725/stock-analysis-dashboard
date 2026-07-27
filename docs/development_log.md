@@ -419,3 +419,28 @@ Gainはその特徴量による分岐が損失関数を改善した量、Split�
 全銘柄集約ではTop 10のAccuracy平均0.5075、F1平均0.4455、ROC-AUC平均0.5268、Total Return平均2.25%、Sharpe Ratio平均0.8854だった。ただし、選択した5種類の標準偏差ではTop 10とBaseline 9が各2指標で最小、All 20が1指標で最小となり、すべての観点で一つの特徴量セットが安定していたわけではない。
 
 この結果は単一の2年期間と5銘柄に限られる。銘柄数や相場局面が異なる場合への一般化を示すものではない。詳細は`docs/experiments/2026-07-24_multi_symbol.md`へ記録した。
+
+---
+
+# Phase 13: Optuna Nested Walk Forward Optimization
+
+## 日付
+
+2026-07-25
+
+## 実装した内容
+
+- Optuna 4.8.0を唯一の新規依存関係として追加した。
+- `src/hyperparameter_optimization.py`へStudy作成、7パラメータの探索、Inner目的関数、Outer Test評価、結果集約、CSV・JSON・PNG保存を実装した。
+- Phase 11のexpanding-window分割と境界パージをOuter/Innerの両方で再利用した。
+- Outer TestをTrial選択へ渡さず、各Outer学習期間だけで独立した20 TrialのStudyを実行した。
+- 取引回数5未満へ1.0、無効SharpeまたはFold失敗へ10.0のPenaltyを適用した。
+- 追加描画依存を導入せず、Trial値、目的関数Best履歴、Parameter ImportanceをPNGへ保存した。
+
+## 実データ確認
+
+7203.Tの2年価格486件、学習データ435件から16 Outer Foldを作った。各Outer Foldで20 Trial、合計320 Trialを実行した。
+
+Outer Test集約では平均Sharpe Ratioが既定モデルの-0.4253からTunedモデルの0.7352へ1.1606上昇した。Accuracyは0.4844から0.4938、ROC-AUCは0.4987から0.5428へ上昇した。一方、F1は0.4978から0.4624へ低下し、Total Return平均は-0.81%から-0.16%へ損失幅が縮小したものの負のままだった。
+
+将来利用候補はOuter Test成績では選ばず、最新Outer FoldのInner Studyから取得した。Best Inner Scoreは0.7291である。指標ごとに変化が異なり、単一銘柄・単一期間のため一般的な性能改善とは断定しない。詳細は`docs/experiments/2026-07-25_optuna.md`へ記録した。
