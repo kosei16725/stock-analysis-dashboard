@@ -55,6 +55,7 @@
 - 学習期間のGain順位によるAll 20 / Top 15 / Top 10 / Baseline 9比較実験
 - 翌営業日Targetがテスト初日を参照する境界サンプル1件を実験学習データから除外
 - expanding windowでFoldごとにGain順位を再計算するウォークフォワード検証
+- 5銘柄へ同一条件のウォークフォワード検証を適用する複数銘柄実験
 - 固定した`random_state`による再現性
 
 ### Backtesting
@@ -125,6 +126,7 @@ stock-analysis-dashboard/
 │   ├── model.py                   # 時系列分割・LightGBM・評価
 │   ├── feature_selection.py       # 学習期間だけで行う特徴量セット比較
 │   ├── walk_forward.py            # expanding windowによる複数Fold検証
+│   ├── multi_symbol_experiment.py # 複数銘柄の実行・集約・CSV出力
 │   ├── backtest.py                # 翌営業日執行バックテスト
 │   ├── visualization.py           # Plotlyグラフ
 │   └── utils.py                   # 共通の入力検証
@@ -135,12 +137,14 @@ stock-analysis-dashboard/
 │   ├── test_model.py
 │   ├── test_feature_selection.py
 │   ├── test_walk_forward.py
+│   ├── test_multi_symbol_experiment.py
 │   ├── test_visualization.py
 │   └── test_backtest.py
 ├── data/
 │   ├── raw/                       # 元データ保存用（現在は未使用）
 │   ├── processed/                 # 加工データ保存用（現在は未使用）
-│   └── models/                    # モデル保存用（現在は未使用）
+│   ├── models/                    # モデル保存用（現在は未使用）
+│   └── results/                   # 実験CSVの出力先（生成CSVはGit対象外）
 ├── docs/
 │   ├── system_design.md
 │   ├── development_log.md
@@ -148,7 +152,8 @@ stock-analysis-dashboard/
 │   │   ├── 2026-07-23_baseline.md # Experiment 0の比較基準
 │   │   ├── 2026-07-23_technical_indicators.md # Phase 8の比較結果
 │   │   ├── 2026-07-23_feature_selection.md # Phase 10の比較結果
-│   │   └── 2026-07-23_walk_forward.md # Phase 11の複数Fold検証
+│   │   ├── 2026-07-23_walk_forward.md # Phase 11の複数Fold検証
+│   │   └── 2026-07-24_multi_symbol.md # Phase 12の5銘柄検証
 │   └── images/                    # 構成図などの保存先
 └── assets/
     └── screenshots/               # README掲載画像の保存先

@@ -27,6 +27,8 @@ data/processed/*
 !data/processed/.gitkeep
 data/models/*
 !data/models/.gitkeep
+data/results/*
+!data/results/.gitkeep
 
 # Logs and temporary files
 *.log

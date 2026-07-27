@@ -395,3 +395,27 @@ Gainはその特徴量による分岐が損失関数を改善した量、Split�
 7203.Tの2年価格488件から学習用438件を作り、100/20/20で16 Foldを評価した。平均AccuracyはAll 20が0.5063、Top 10が0.5031、Top 15とBaseline 9が0.4781だった。平均Total ReturnはTop 10が1.15%、All 20が0.86%、Top 15が0.06%、Baseline 9が-0.68%だった。
 
 標準偏差の小ささではTop 15がAccuracy、Precision、F1、Total Return、Max Drawdownで最小だった。一方、Recall、ROC-AUC、Sharpe Ratio、Win Rateなどは別セットの標準偏差が小さく、すべての観点で一つのセットが最も安定していたわけではない。詳細は`docs/experiments/2026-07-23_walk_forward.md`へ記録する。
+
+---
+
+# Phase 12: Multi-Symbol Walk-Forward Validation
+
+## 日付
+
+2026-07-24
+
+## 実装した内容
+
+- `src/multi_symbol_experiment.py`を追加し、複数銘柄のデータ取得からPhase 11呼び出し、結果集約、失敗管理、CSV保存までを実装した。
+- 1銘柄の失敗で全体を停止せず、失敗理由を記録して残りを継続する。全銘柄失敗時だけ`ValueError`とした。
+- 銘柄別Fold結果、銘柄別集約、全成功銘柄・全Foldの総合集約をDataFrameで返す。
+- `data/results/multi_symbol_fold_results.csv`と`data/results/multi_symbol_summary.csv`へ保存できるようにした。生成CSVはGit管理対象外とした。
+- 通信処理をモックしたテストで、一部失敗時の継続、全失敗、集約、CSV生成、入力非破壊、Phase 11への条件引き渡しを検証した。
+
+## 実データ確認
+
+7203.T、6758.T、9432.T、8306.T、8035.Tを2年、100/20/20、Buy Threshold 0.55で評価した。5銘柄すべて成功し、各16 Fold、合計80 Foldとなった。
+
+全銘柄集約ではTop 10のAccuracy平均0.5075、F1平均0.4455、ROC-AUC平均0.5268、Total Return平均2.25%、Sharpe Ratio平均0.8854だった。ただし、選択した5種類の標準偏差ではTop 10とBaseline 9が各2指標で最小、All 20が1指標で最小となり、すべての観点で一つの特徴量セットが安定していたわけではない。
+
+この結果は単一の2年期間と5銘柄に限られる。銘柄数や相場局面が異なる場合への一般化を示すものではない。詳細は`docs/experiments/2026-07-24_multi_symbol.md`へ記録した。

@@ -121,6 +121,16 @@ flowchart LR
 5. 株価と移動平均、Gain / Split特徴量重要度、累積リターン比較をPlotlyで表示する。
 6. 特徴量重要度はタブ切り替えグラフ、一覧表、Gain上位5件、Gain・Splitそれぞれの重要度が0の件数を表示する。
 
+## 複数銘柄ウォークフォワード実験の流れ
+
+1. `multi_symbol_experiment.py`が対象銘柄を順番に取得し、既存の特徴量生成を呼び出す。
+2. 銘柄ごとにPhase 11の`run_walk_forward_experiment`をそのまま呼び出し、Fold作成、境界ラベルのパージ、特徴量選択、学習、バックテストを再利用する。
+3. 1銘柄が取得または評価に失敗しても理由を記録し、残りの銘柄を継続する。全銘柄が失敗した場合だけ処理を停止する。
+4. 成功銘柄のFold別結果、銘柄別集約、全銘柄・全Foldの総合集約を作成する。
+5. 結果を`data/results/`へCSV出力する。生成CSVはGit管理対象外とし、実験条件と主要結果はMarkdownの実験記録へ保存する。
+
+各銘柄は独立して評価し、全銘柄に2年、initial train 100件、test 20件、step 20件、Buy Threshold 0.55を適用する。複数銘柄を結合して学習する方式ではないため、ある銘柄の将来情報が別銘柄の学習へ入ることはない。
+
 ## 予測からバックテストまでの流れ
 
 1. `model.py` がテスト期間について上昇クラス1の予測確率を返す。
@@ -151,6 +161,7 @@ Total TradesはCashからBuyへ切り替わった回数とする。Win RateはBu
 | `src/model.py` | 時系列分割、LightGBM学習、予測、評価、特徴量重要度 |
 | `src/feature_selection.py` | 学習期間のGain順位、特徴量セット再学習、分類・バックテスト比較 |
 | `src/walk_forward.py` | expanding window Fold作成、Fold別評価、平均・標準偏差集約 |
+| `src/multi_symbol_experiment.py` | 複数銘柄の取得、Phase 11呼び出し、失敗管理、総合集約、CSV出力 |
 | `src/backtest.py` | 翌営業日執行、Buy & Hold比較、バックテスト指標 |
 | `tests/` | 通信非依存の自動テスト |
 
